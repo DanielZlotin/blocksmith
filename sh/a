@@ -1,0 +1,19 @@
+#!/bin/zsh
+set -euo pipefail
+
+local c=${CHAIN:-"31337"}
+[[ $# -gt 1 ]] && c=$(getchain $1 | jq -rj ".id") && shift
+
+local a=$1
+if [[ $1 == "w" ]]; then
+  case $c in
+    "56") a="wbnb";;
+    "137") a="wmatic";;
+    "43114") a="wavax";;
+    "250") a="wftm";;
+    "1284") a="wglmr";;
+    *) a="weth";;
+  esac
+fi
+
+jq -er ".\"$c\".\"$a\" // .\"*\".\"$a\"" $XDG_CONFIG_HOME/defi/addresses.json

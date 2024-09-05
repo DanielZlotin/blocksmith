@@ -1,0 +1,6 @@
+#!/bin/zsh
+set -euo pipefail
+
+dapp=$1
+shift
+. "$(dirname $0)/sh/dapps/$dapp" $@

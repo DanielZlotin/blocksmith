@@ -1,0 +1,75 @@
+#!/bin/zsh
+set -euo pipefail
+
+args=()
+local initBalance=0
+while [[ "$#" -gt 0 ]]
+do case $1 in
+    -b|--balance) initBalance=$2; shift 2;;
+    *) args+=("$1"); shift;;
+esac
+done
+
+chainId=$args[1]
+owner=$args[2]
+
+unset ETH_KEYSTORE_ACCOUNT
+source setchain $chainId
+
+local pair
+local tokenA
+local tokenB
+[[ $#args[@] == 3 ]] && {
+  pair=$args[3]
+  tokenA=$(cast call $pair "token0()(address)")
+  tokenB=$(cast call $pair "token1()(address)")
+} || {
+  factory=$args[3]
+  tokenA=$args[4]
+  tokenB=$args[5]
+  pair=$(cast call $factory "getPair(address,address)(address)" $tokenA $tokenB)
+}
+
+local token0
+local token1
+[[ $(echo "$(cast to-base $tokenA 10) < $(cast to-base $tokenB 10)" | bc) -eq 1 ]] && { token0=$tokenA; token1=$tokenB } || { token0=$tokenB; token1=$tokenA }
+
+
+results=$(cast call $(a mc) 'aggregate3((address,bool,bytes)[])((bool,bytes)[])' "[ \
+  ($pair,false,$(cast calldata "getReserves()")), \
+  ($pair,false,$(cast calldata "balanceOf(address)" $owner)), \
+  ($pair,false,$(cast calldata "totalSupply()")), \
+  ($token0,false,$(cast calldata "decimals()")), \
+  ($token1,false,$(cast calldata "decimals()")), \
+  ($token0,false,$(cast calldata "symbol()")), \
+  ($token1,false,$(cast calldata "symbol()")) \
+  ]" |
+  tr -d '[],' |
+  sed -E 's@\((true|false) (0x[0-9a-fA-F]*)\)@\2@g' |
+  tr ' ' '\n'
+)
+
+reserves=$(cast abi-decode "f()(uint112,uint112)" $(echo $results | sed -n "1p"))
+reserve0=$(echo $reserves | sed -n '1p' | cut -d " " -f1)
+reserve1=$(echo $reserves | sed -n '2p' | cut -d " " -f1)
+
+lpBalance=$(cast abi-decode "f()(uint256)" $(echo $results | sed -n "2p") | cut -d " " -f1)
+lpBalance=$(echo "$lpBalance + $initBalance" | bc)
+lpSupply=$(cast abi-decode "f()(uint256)" $(echo $results | sed -n "3p") | cut -d " " -f1)
+token0Decimals=$(cast abi-decode "f()(uint256)" $(echo $results | sed -n "4p") | cut -d " " -f1)
+token1Decimals=$(cast abi-decode "f()(uint256)" $(echo $results | sed -n "5p") | cut -d " " -f1)
+symbol0=$(cast abi-decode "f()(string)" $(echo $results | sed -n "6p") | cut -d " " -f1)
+symbol1=$(cast abi-decode "f()(string)" $(echo $results | sed -n "7p") | cut -d " " -f1)
+
+amount0=$(echo "$reserve0 * $lpBalance / $lpSupply" | bc)
+amount1=$(echo "$reserve1 * $lpBalance / $lpSupply" | bc)
+
+amount0ui=$(bc -l <<< "scale=$token0Decimals; $amount0 / (10^$token0Decimals)")
+amount1ui=$(bc -l <<< "scale=$token1Decimals; $amount1 / (10^$token1Decimals)")
+
+jq -n "{symbol0:$symbol0,symbol1:$symbol1,
+token0:\"$token0\",token1:\"$token1\",
+amount0ui:$amount0ui,amount1ui:$amount1ui,
+amount0:\"$amount0\",amount1:\"$amount1\",
+}"
+

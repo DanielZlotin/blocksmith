@@ -1,0 +1,45 @@
+#!/bin/zsh
+set -euo pipefail
+
+chainId=$1
+nft=$2
+tokenId=$3
+
+unset ETH_KEYSTORE_ACCOUNT
+source setchain $chainId
+
+# nonce uint96, operator address, token0 address, token1 address, fee uint24, tickLower int24, tickUpper int24, liquidity uint128, feeGrowthInside0LastX128 uint256, feeGrowthInside1LastX128 uint256, tokensOwed0 uint128, tokensOwed1 uint128
+position=$(cast call $nft "positions(uint256)(uint96, address, address, address, int24, int24, uint128, uint256, uint256, uint128, uint128)" $tokenId)
+token0=$(echo $position | sed -n '3p' | cut -d " " -f1)
+token1=$(echo $position | sed -n '4p' | cut -d " " -f1)
+fee=0
+tickLower=$(echo $position | sed -n "5p" | cut -d' ' -f1)
+tickUpper=$(echo $position | sed -n "6p" | cut -d' ' -f1)
+liquidity=$(echo $position | sed -n "7p" | cut -d' ' -f1)
+feeGrowthInside0LastX128=$(echo $position | sed -n "8p" | cut -d' ' -f1)
+feeGrowthInside1LastX128=$(echo $position | sed -n "9p" | cut -d' ' -f1)
+
+token0Decimals=$(cast call $token0 "decimals()(uint256)")
+token1Decimals=$(cast call $token1 "decimals()(uint256)")
+token0Symbol=$(cast call $token0 "symbol()(string)")
+token1Symbol=$(cast call $token1 "symbol()(string)")
+factory=$(cast call $nft "factory()(address)")
+pool=$(cast call $factory "poolByPair(address,address)(address)" $token0 $token1)
+feeGrowthGlobal0X128=$(cast call $pool "totalFeeGrowth0Token()(uint256)" | cut -d " " -f1)
+feeGrowthGlobal1X128=$(cast call $pool "totalFeeGrowth1Token()(uint256)" | cut -d " " -f1)
+
+# liquidityGross uint128, liquidityNet int128, feeGrowthOutside0X128 uint256, feeGrowthOutside1X128 uint256, tickCumulativeOutside int56, secondsPerLiquidityOutsideX128 uint160, secondsOutside uint32, initialized bool
+tickLowerData=$(cast call $pool "ticks(int24)(uint128,int128,uint256,uint256,int56,uint160,uint32,bool)" -- $tickLower)
+tickUpperData=$(cast call $pool "ticks(int24)(uint128,int128,uint256,uint256,int56,uint160,uint32,bool)" -- $tickUpper)
+feeGrowthOutsideLower0X128=$(echo $tickLowerData | sed -n '3p' | cut -d " " -f1)
+feeGrowthOutsideLower1X128=$(echo $tickLowerData | sed -n '4p' | cut -d " " -f1)
+feeGrowthOutsideUpper0X128=$(echo $tickUpperData | sed -n '3p' | cut -d " " -f1)
+feeGrowthOutsideUpper1X128=$(echo $tickUpperData | sed -n '4p' | cut -d " " -f1)
+
+slot0=$(cast call $pool "globalState()(uint160,int24)")
+tick=$(echo $slot0 | sed -n '2p' | cut -d " " -f1)
+
+defi clp $token0 $token1 $token0Symbol $token1Symbol $token0Decimals $token1Decimals $liquidity $tick $tickLower $tickUpper \
+$feeGrowthGlobal0X128 $feeGrowthGlobal1X128 $feeGrowthOutsideLower0X128 \
+$feeGrowthOutsideLower1X128 $feeGrowthOutsideUpper0X128 $feeGrowthOutsideUpper1X128 \
+$feeGrowthInside0LastX128 $feeGrowthInside1LastX128
