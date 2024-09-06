@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-if [  $# -ne 1 ]; then
+if [[ $# -ne 1 || $1 = 0 ]]; then
 	unset CHAIN CHAIN_NAME RPC_URL EXPLORER_URL EXPLORER_API_KEY FOUNDRY_ETH_RPC_URL VERIFIER_URL ETHERSCAN_API_KEY
 else
 	c=$(getchain $1)
