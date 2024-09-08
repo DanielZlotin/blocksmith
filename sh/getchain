@@ -1,5 +1,0 @@
-#!/bin/zsh
-set -euo pipefail
-
-selector=$([ "$1" -eq "$1" ] 2>/dev/null && echo '.["'$1'"]' || echo '.[] | select(.name == "'$1'")' )
-jq -ej $selector $XDG_CONFIG_HOME/defi/chains.json
