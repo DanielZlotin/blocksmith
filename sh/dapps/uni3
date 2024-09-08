@@ -8,8 +8,8 @@ tokenId=$3
 unset ETH_KEYSTORE_ACCOUNT
 source setchain $chainId
 
-owner=$(cast call $nft "ownerOf(uint256)(address)" $tokenId)
-position=$(cast call $nft "positions(uint256)(uint96, address, address, address, uint24, int24, int24, uint128, uint256, uint256, uint128, uint128)" $tokenId)
+owner=$(cast call ${BLOCK:+-b=$BLOCK} $nft "ownerOf(uint256)(address)" $tokenId)
+position=$(cast call ${BLOCK:+-b=$BLOCK} $nft "positions(uint256)(uint96, address, address, address, uint24, int24, int24, uint128, uint256, uint256, uint128, uint128)" $tokenId)
 token0=$(echo $position | sed -n '3p' | cut -d " " -f1)
 token1=$(echo $position | sed -n '4p' | cut -d " " -f1)
 fee=$(echo $position | sed -n '5p' | cut -d " " -f1)
@@ -19,18 +19,18 @@ liquidity=$(echo $position | sed -n "8p" | cut -d' ' -f1)
 feeGrowthInside0LastX128=$(echo $position | sed -n "9p" | cut -d' ' -f1)
 feeGrowthInside1LastX128=$(echo $position | sed -n "10p" | cut -d' ' -f1)
 
-token0Decimals=$(cast call $token0 "decimals()(uint256)")
-token1Decimals=$(cast call $token1 "decimals()(uint256)")
-token0Symbol=$(cast call $token0 "symbol()(string)")
-token1Symbol=$(cast call $token1 "symbol()(string)")
-factory=$(cast call $nft "factory()(address)")
-pool=$(cast call $factory "getPool(address,address,uint24)(address)" $token0 $token1 $fee)
+token0Decimals=$(cast call ${BLOCK:+-b=$BLOCK} $token0 "decimals()(uint256)")
+token1Decimals=$(cast call ${BLOCK:+-b=$BLOCK} $token1 "decimals()(uint256)")
+token0Symbol=$(cast call ${BLOCK:+-b=$BLOCK} $token0 "symbol()(string)")
+token1Symbol=$(cast call ${BLOCK:+-b=$BLOCK} $token1 "symbol()(string)")
+factory=$(cast call ${BLOCK:+-b=$BLOCK} $nft "factory()(address)")
+pool=$(cast call ${BLOCK:+-b=$BLOCK} $factory "getPool(address,address,uint24)(address)" $token0 $token1 $fee)
 
-slot0=$(cast call $pool "slot0()(uint160,int24)")
+slot0=$(cast call ${BLOCK:+-b=$BLOCK} $pool "slot0()(uint160,int24)")
 tick=$(echo $slot0 | sed -n '2p' | cut -d " " -f1)
 
 MAX_UINT128=340282366920938463463374607431768211455
-fees=$(cast call $nft "collect((uint256,address,uint128,uint128))(uint256,uint256)" "($tokenId,$owner,$MAX_UINT128,$MAX_UINT128)" --from $owner)
+fees=$(cast call ${BLOCK:+-b=$BLOCK} $nft "collect((uint256,address,uint128,uint128))(uint256,uint256)" "($tokenId,$owner,$MAX_UINT128,$MAX_UINT128)" --from $owner)
 fees0=$(echo $fees | sed -n '1p' | cut -d " " -f1)
 fees1=$(echo $fees | sed -n '2p' | cut -d " " -f1)
 
