@@ -21,13 +21,13 @@ local tokenA
 local tokenB
 [[ $#args[@] == 3 ]] && {
   pair=$args[3]
-  tokenA=$(cast call $pair "token0()(address)")
-  tokenB=$(cast call $pair "token1()(address)")
+  tokenA=$(cast call ${BLOCK:+-b=$BLOCK} $pair "token0()(address)")
+  tokenB=$(cast call ${BLOCK:+-b=$BLOCK} $pair "token1()(address)")
 } || {
   factory=$args[3]
   tokenA=$args[4]
   tokenB=$args[5]
-  pair=$(cast call $factory "getPair(address,address)(address)" $tokenA $tokenB)
+  pair=$(cast call ${BLOCK:+-b=$BLOCK} $factory "getPair(address,address)(address)" $tokenA $tokenB)
 }
 
 local token0
@@ -35,7 +35,7 @@ local token1
 [[ $(echo "$(cast to-base $tokenA 10) < $(cast to-base $tokenB 10)" | bc) -eq 1 ]] && { token0=$tokenA; token1=$tokenB } || { token0=$tokenB; token1=$tokenA }
 
 
-results=$(cast call $(a mc) 'aggregate3((address,bool,bytes)[])((bool,bytes)[])' "[ \
+results=$(cast call ${BLOCK:+-b=$BLOCK} $(a mc) 'aggregate3((address,bool,bytes)[])((bool,bytes)[])' "[ \
   ($pair,false,$(cast calldata "getReserves()")), \
   ($pair,false,$(cast calldata "balanceOf(address)" $owner)), \
   ($pair,false,$(cast calldata "totalSupply()")), \
